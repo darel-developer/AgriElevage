@@ -162,6 +162,7 @@
                                     <th>SEXE</th>
                                     <th>ÂGE</th>
                                     <th>STATUT</th>
+                                    <th>VENDU</th> <!-- colonne ajoutée -->
                                 </tr>
                             </thead>
                             <tbody id="animalListBody">
@@ -254,6 +255,16 @@
       <div class="modal-body">
         <div id="breedingFormAlert"></div>
         <div class="mb-3">
+          <!-- Espèce : permet de filtrer mâles/femelles -->
+          <label class="form-label">Espèce</label>
+          <select class="form-select" name="espece" id="breedingSpeciesSelect" required>
+              <option value="">Choisir...</option>
+              @foreach($types as $type)
+                  <option value="{{ $type }}">{{ ucfirst($type) }}</option>
+              @endforeach
+          </select>
+        </div>
+        <div class="mb-3">
           <label class="form-label">Mâle</label>
           <select class="form-select" name="male_id" id="breedingMaleSelect" required>
             <option value="">Sélectionner un mâle</option>
@@ -269,7 +280,7 @@
         </div>
         <div class="mb-3">
           <label class="form-label">Date de mise bas</label>
-          <input type="date" class="form-control" name="date_mise_bas" required>
+          <input type="date" id="breedingMiseBas" class="form-control" name="date_mise_bas" required>
         </div>
         <div class="mb-3">
           <label class="form-label">Taille de la portée</label>
@@ -282,6 +293,57 @@
       </div>
       <div class="modal-footer">
         <button type="submit" class="btn btn-success">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Enregistrer poids -->
+<div class="modal fade" id="weightModal" tabindex="-1" aria-labelledby="weightModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="weightForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="weightModalLabel">Enregistrer le poids</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="weightAnimalId" name="id">
+        <div id="weightFormAlert"></div>
+        <div class="mb-3">
+          <label class="form-label">Poids (kg)</label>
+          <input type="number" step="0.01" class="form-control" name="poids" id="weightValue" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" name="poids_date" id="weightDate">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Marquer comme vendu -->
+<div class="modal fade" id="sellModal" tabindex="-1" aria-labelledby="sellModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="sellForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sellModalLabel">Marquer comme vendu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="sellAnimalId" name="id">
+        <div id="sellFormAlert"></div>
+        <p>Confirmer la vente de l'animal sélectionné ?</p>
+        <div class="mb-3">
+          <label class="form-label">Prix de vente (optionnel)</label>
+          <input type="number" step="0.01" class="form-control" name="prix_vente" id="sellPrice">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-danger">Marquer comme vendu</button>
       </div>
     </form>
   </div>
@@ -400,7 +462,7 @@
             const tbody = document.getElementById('animalListBody');
             tbody.innerHTML = '';
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center">Aucun animal trouvé.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">Aucun animal trouvé.</td></tr>';
                 document.getElementById('animalDetailCol').style.display = 'none';
                 return;
             }
@@ -410,10 +472,11 @@
                 tr.dataset.id = animal.id;
                 tr.innerHTML = `
                     <td>${animal.nom}</td>
-                    <td>${animal.type.charAt(0).toUpperCase() + animal.type.slice(1)}</td>
-                    <td>${animal.sexe.charAt(0).toUpperCase() + animal.sexe.slice(1)}</td>
+                    <td>${animal.type}</td>
+                    <td>${animal.sexe}</td>
                     <td>${animal.age}</td>
                     <td>${animal.statut || 'En bonne santé'}</td>
+                    <td>${animal.vendu ? 'Oui' : 'Non'}</td>
                 `;
                 tr.onclick = function() { selectAnimal(animal.id); };
                 tbody.appendChild(tr);
@@ -443,24 +506,45 @@
                     <div><span class="animal-detail-label">Nom:</span> <span class="animal-detail-value">${animal.nom}</span></div>
                     <div><span class="animal-detail-label">Espèce:</span> <span class="animal-detail-value">${animal.type}</span></div>
                     <div><span class="animal-detail-label">Sexe:</span> <span class="animal-detail-value">${animal.sexe}</span></div>
-                    <div><span class="animal-detail-label">Race:</span> <span class="animal-detail-value">${animal.race || '-'}</span></div>
+                    <div><span class="animal-detail-label">Race:</span> <span class="animal-detail-value">${animal.race}</span></div>
                     <div><span class="animal-detail-label">Date de naissance:</span> <span class="animal-detail-value">${animal.date_naissance}</span></div>
-                    <div><span class="animal-detail-label">Identifiant:</span> <span class="animal-detail-value">${animal.identifiant || '-'}</span></div>
+                    <div><span class="animal-detail-label">Identifiant:</span> <span class="animal-detail-value">${animal.identifiant}</span></div>
                 </div>
                 <div class="animal-detail-section-title">Lignage</div>
-                <div><span class="animal-detail-label">Mère:</span> <span class="animal-detail-value">${animal.mere || '-'}</span></div>
-                <div><span class="animal-detail-label">Père:</span> <span class="animal-detail-value">${animal.pere || '-'}</span></div>
-                <div><span class="animal-detail-label">Grands-parents:</span> <span class="animal-detail-value">${animal.grands_parents || '-'}</span></div>
+                <div><span class="animal-detail-label">Mère:</span> <span class="animal-detail-value">${animal.mere}</span></div>
+                <div><span class="animal-detail-label">Père:</span> <span class="animal-detail-value">${animal.pere}</span></div>
+                <div><span class="animal-detail-label">Grands-parents:</span> <span class="animal-detail-value">${animal.grands_parents}</span></div>
                 <div class="animal-detail-section-title">Historique</div>
                 <div class="animal-detail-history">${animal.historique || '<span class="text-muted">Aucun historique.</span>'}</div>
                 <div class="animal-detail-section-title">Actions Rapides</div>
                 <div class="animal-detail-actions">
-                    ${animal.type === 'Lapin' ? '<a href="{{ route('breeding-planning') }}"><button class="btn btn-outline-success btn-sm">Reproduire</button></a>' : ''}
-                    <button class="btn btn-outline-success btn-sm">Traiter</button>
-                    <button class="btn btn-outline-secondary btn-sm">Marquer comme vendu</button>
-                    <button class="btn btn-outline-success btn-sm">Enregistrer poids</button>
+                    ${animal.type.toLowerCase() === 'lapin' ? '<a href="{{ route('breeding-planning') }}"><button class="btn btn-outline-success btn-sm">Reproduire</button></a>' : ''}
+                    <button class="btn btn-outline-success btn-sm" id="btnTreat">Traiter</button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnMarkSold">Marquer comme vendu</button>
+                    <button class="btn btn-outline-success btn-sm" id="btnRecordWeight">Enregistrer poids</button>
                 </div>
             `;
+
+            // Attacher handlers pour les boutons nouvellement insérés
+            // use onclick to avoid multiple listeners when selectAnimal est rappelé
+            const btnRecord = document.getElementById('btnRecordWeight');
+            if (btnRecord) {
+                btnRecord.onclick = function() {
+                    document.getElementById('weightAnimalId').value = animal.id;
+                    document.getElementById('weightValue').value = animal.poids ?? '';
+                    document.getElementById('weightFormAlert').innerHTML = '';
+                    new bootstrap.Modal(document.getElementById('weightModal')).show();
+                };
+            }
+            const btnSell = document.getElementById('btnMarkSold');
+            if (btnSell) {
+                btnSell.onclick = function() {
+                    document.getElementById('sellAnimalId').value = animal.id;
+                    document.getElementById('sellPrice').value = '';
+                    document.getElementById('sellFormAlert').innerHTML = '';
+                    new bootstrap.Modal(document.getElementById('sellModal')).show();
+                };
+            }
         });
     }
 
@@ -469,102 +553,208 @@
         modal.show();
     }
 
-    // Ouvre la modale d'ajout de croisement
-    document.getElementById('addBreedingBtn').onclick = function() {
-        loadBreedingAnimals();
-        document.getElementById('breedingForm').reset();
-        document.getElementById('breedingFormAlert').innerHTML = '';
-        document.getElementById('breedingMiseBas').value = '';
-        var modal = new bootstrap.Modal(document.getElementById('breedingModal'));
-        modal.show();
-    };
+    // Charger les animaux pour la modale de croisement (filtre par espèce)
+    function loadBreedingAnimals(species = null) {
+        // prendre la valeur du select si non fournie
+        const speciesSelect = document.getElementById('breedingSpeciesSelect');
+        const type = species || (speciesSelect ? speciesSelect.value : '') || '';
+        const url = type ? `/animals?type=${encodeURIComponent(type)}` : `/animals`;
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+         .then(res => res.json())
+         .then(data => {
+             const maleSelect = document.getElementById('breedingMaleSelect');
+             const femaleSelect = document.getElementById('breedingFemaleSelect');
+             maleSelect.innerHTML = '<option value="">Sélectionner un mâle</option>';
+             femaleSelect.innerHTML = '<option value="">Sélectionner une femelle</option>';
+             data.forEach(animal => {
+                 if (animal.sexe && animal.sexe.toLowerCase() === 'male') {
+                     maleSelect.innerHTML += `<option value="${animal.id}">${animal.nom}</option>`;
+                 }
+                 if (animal.sexe && animal.sexe.toLowerCase() === 'femelle') {
+                     femaleSelect.innerHTML += `<option value="${animal.id}">${animal.nom}</option>`;
+                 }
+             });
+         });
+    }
 
-    // Charger les animaux pour la modale de croisement
-    function loadBreedingAnimals() {
-        fetch('/animals?type=lapin', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(res => res.json())
-        .then(data => {
-            const maleSelect = document.getElementById('breedingMaleSelect');
-            const femaleSelect = document.getElementById('breedingFemaleSelect');
-            maleSelect.innerHTML = '<option value="">Sélectionner un mâle</option>';
-            femaleSelect.innerHTML = '<option value="">Sélectionner une femelle</option>';
-            data.forEach(animal => {
-                if (animal.sexe && animal.sexe.toLowerCase() === 'male') {
-                    maleSelect.innerHTML += `<option value="${animal.id}">${animal.nom}</option>`;
-                }
-                if (animal.sexe && animal.sexe.toLowerCase() === 'femelle') {
-                    femaleSelect.innerHTML += `<option value="${animal.id}">${animal.nom}</option>`;
-                }
-            });
+    // lorsque l'utilisateur change l'espèce dans la modale, recharger la liste
+    const breedingSpeciesEl = document.getElementById('breedingSpeciesSelect');
+    if (breedingSpeciesEl) {
+        breedingSpeciesEl.addEventListener('change', function() {
+            loadBreedingAnimals(this.value);
         });
     }
 
+     // Ouvre la modale d'ajout de croisement
+     document.getElementById('addBreedingBtn').onclick = function() {
+        // définir une valeur par défaut 'lapin' si présente dans le select
+        const sp = document.getElementById('breedingSpeciesSelect');
+        if (sp && !sp.value) {
+            const lap = Array.from(sp.options).find(o => o.value && o.value.toLowerCase() === 'lapin');
+            if (lap) sp.value = lap.value;
+        }
+        loadBreedingAnimals();
+         document.getElementById('breedingForm').reset();
+         document.getElementById('breedingFormAlert').innerHTML = '';
+         // guard : si l'élément existe on le vide sinon on ignore
+         const bb = document.getElementById('breedingMiseBas');
+         if (bb) bb.value = '';
+         var modal = new bootstrap.Modal(document.getElementById('breedingModal'));
+         modal.show();
+     };
+
     // Soumission AJAX du formulaire de croisement
     document.getElementById('breedingForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const alertEl = document.getElementById('breedingFormAlert');
+      alertEl.innerHTML = ''; // clear previous message
+
+      const data = new FormData(form);
+      // ensure CSRF token is sent in body
+      data.append('_token', '{{ csrf_token() }}');
+
+      fetch("{{ url('/breeding') }}", {
+        method: "POST",
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': "{{ csrf_token() }}"
+        },
+        body: data
+      })
+      .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const payload = isJson ? await res.json().catch(() => null) : null;
+        if (res.ok) {
+          // success response
+          form.reset();
+          alertEl.innerHTML = '<div class="alert alert-success">Croisement enregistré avec succès !</div>';
+          setTimeout(() => {
+            hideModalClean('breedingModal');
+            alertEl.innerHTML = '';
+            loadAnimalList();
+          }, 900);
+          return;
+        }
+        // validation error 422
+        if (res.status === 422 && payload && payload.errors) {
+          const msgs = Object.values(payload.errors).flat().join('<br>');
+          alertEl.innerHTML = `<div class="alert alert-danger">${msgs}</div>`;
+          return;
+        }
+        // other errors: display provided message or status text
+        const msg = payload && payload.message ? payload.message : `Erreur (${res.status}) lors de l'enregistrement.`;
+        alertEl.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
+      })
+      .catch(err => {
+        console.error(err);
+        alertEl.innerHTML = '<div class="alert alert-danger">Erreur lors de l\'enregistrement (connexion).</div>';
+      });
+    });
+
+    // Soumission enregistrement poids
+    document.getElementById('weightForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        const id = document.getElementById('weightAnimalId').value;
         const form = this;
-        const data = new FormData(form);
-        fetch("{{ route('breeding.store') }}", {
+        const formData = new FormData(form);
+        // add token to be safe
+        formData.append('_token', '{{ csrf_token() }}');
+        fetch(`/animals/${id}`, {
             method: "POST",
-            headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
-            body: data
+            headers: {
+                'X-HTTP-Method-Override': 'PUT',
+                'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw res;
+            return res.json();
+        })
         .then(json => {
             if (json.success) {
-                form.reset();
-                document.getElementById('breedingFormAlert').innerHTML =
-                    '<div class="alert alert-success">Croisement enregistré avec succès !</div>';
+                document.getElementById('weightFormAlert').innerHTML = '<div class="alert alert-success">Poids enregistré.</div>';
                 setTimeout(() => {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('breedingModal'));
-                    modal.hide();
-                }, 1200);
+                    hideModalClean('weightModal');
+                    loadAnimalList(id);
+                }, 700);
             } else {
-                document.getElementById('breedingFormAlert').innerHTML =
-                    '<div class="alert alert-danger">Erreur lors de l\'enregistrement.</div>';
+                document.getElementById('weightFormAlert').innerHTML = '<div class="alert alert-danger">Erreur.</div>';
             }
         })
-        .catch(() => {
-            document.getElementById('breedingFormAlert').innerHTML =
-                '<div class="alert alert-danger">Erreur lors de l\'enregistrement.</div>';
+        .catch(async (err) => {
+            let msg = 'Erreur.';
+            try {
+                const j = await (err.json ? err.json() : Promise.resolve(null));
+                if (j && j.errors) msg = Object.values(j.errors).flat().join(' ');
+            } catch(e){}
+            console.error(err);
+            document.getElementById('weightFormAlert').innerHTML = `<div class="alert alert-danger">${msg}</div>`;
         });
     });
 
-    // Initialisation
-    loadAnimalList();
-
-</script>
-</body>
-</html>
-</html>
+    // Soumission marquer comme vendu
+    document.getElementById('sellForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        const id = document.getElementById('sellAnimalId').value;
         const form = this;
-        const data = new FormData(form);
-        fetch("{{ route('breeding.store') }}", {
+        const formData = new FormData(form);
+        formData.append('vendu', 1);
+        formData.append('_token', '{{ csrf_token() }}');
+        fetch(`/animals/${id}`, {
             method: "POST",
-            headers: { 'X-CSRF-TOKEN': "{{ csrf_token() }}" },
-            body: data
+            headers: {
+                'X-HTTP-Method-Override': 'PUT',
+                'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw res;
+            return res.json();
+        })
         .then(json => {
             if (json.success) {
-                form.reset();
-                document.getElementById('breedingFormAlert').innerHTML =
-                    '<div class="alert alert-success">Croisement enregistré avec succès !</div>';
+                document.getElementById('sellFormAlert').innerHTML = '<div class="alert alert-success">Marqué comme vendu.</div>';
                 setTimeout(() => {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('breedingModal'));
-                    modal.hide();
-                }, 1200);
+                    hideModalClean('sellModal');
+                    loadAnimalList(id);
+                }, 700);
             } else {
-                document.getElementById('breedingFormAlert').innerHTML =
-                    '<div class="alert alert-danger">Erreur lors de l\'enregistrement.</div>';
+                document.getElementById('sellFormAlert').innerHTML = '<div class="alert alert-danger">Erreur.</div>';
             }
         })
-        .catch(() => {
-            document.getElementById('breedingFormAlert').innerHTML =
-                '<div class="alert alert-danger">Erreur lors de l\'enregistrement.</div>';
+        .catch(async (err) => {
+            let msg = 'Erreur.';
+            try {
+                const j = await (err.json ? err.json() : Promise.resolve(null));
+                if (j && j.errors) msg = Object.values(j.errors).flat().join(' ');
+            } catch(e){}
+            console.error(err);
+            document.getElementById('sellFormAlert').innerHTML = `<div class="alert alert-danger">${msg}</div>`;
         });
     });
+
+    // helper pour cacher correctement une modal et nettoyer backdrop
+    function hideModalClean(id) {
+        const modalEl = document.getElementById(id);
+        if (!modalEl) return;
+        const inst = bootstrap.Modal.getInstance(modalEl);
+        if (inst) {
+            inst.hide();
+        } else {
+            try { new bootstrap.Modal(modalEl).hide(); } catch(e) {}
+        }
+        // supprimer tout backdrop résiduel et la classe sur body
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+    }
 
     // Initialisation
     loadAnimalList();

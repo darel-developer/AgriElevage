@@ -18,30 +18,39 @@ class ReproductiveAnalyticsController extends Controller
         $dateFrom = Carbon::now()->subDays($periode);
 
         // Filtre sur l'espèce si besoin
-        $breedingQuery = Breeding::where('date_croisement', '>=', $dateFrom);
+        // On base l'analyse sur date_mise_bas (analyses des mises bas)
+        $breedingQuery = Breeding::where('date_mise_bas', '>=', $dateFrom);
         if ($espece) {
-            $breedingQuery->whereHas('female', function($q) use ($espece) {
-                $q->where('type', $espece);
-            });
+            $breedingQuery->where('espece', $espece);
         }
         $breedings = $breedingQuery->get();
 
-        // Statistiques principales
-        $totalAccouplements = $breedings->count();
-        $totalAccouplementsLastMonth = Breeding::where('date_croisement', '>=', Carbon::now()->subDays($periode+30))
-            ->where('date_croisement', '<', Carbon::now()->subDays($periode))
+        // Statistiques principales basées sur date_mise_bas
+        $totalMisesBas = $breedings->count();
+        $totalMisesBasLastPeriod = Breeding::where('date_mise_bas', '>=', Carbon::now()->subDays($periode+30))
+            ->where('date_mise_bas', '<', Carbon::now()->subDays($periode))
+            ->when($espece, function($q) use ($espece) { $q->where('espece', $espece); })
             ->count();
-        $variationAccouplements = $totalAccouplementsLastMonth > 0
-            ? round((($totalAccouplements - $totalAccouplementsLastMonth) / $totalAccouplementsLastMonth) * 100, 1)
+        $variationMisesBas = $totalMisesBasLastPeriod > 0
+            ? round((($totalMisesBas - $totalMisesBasLastPeriod) / $totalMisesBasLastPeriod) * 100, 1)
             : null;
 
-        $tailleMoyennePortee = round($breedings->avg('taille_portee'), 1);
-        $tailleMoyennePorteeAnnee = Breeding::where('date_croisement', '>=', Carbon::now()->subYear())->avg('taille_portee');
+        $tailleMoyennePortee = $breedings->avg('taille_portee') ? round($breedings->avg('taille_portee'), 1) : 0;
+        $tailleMoyennePorteeAnnee = Breeding::where('date_mise_bas', '>=', Carbon::now()->subYear())
+            ->when($espece, function($q) use ($espece) { $q->where('espece', $espece); })
+            ->avg('taille_portee');
         $variationPortee = $tailleMoyennePorteeAnnee ? round($tailleMoyennePortee - $tailleMoyennePorteeAnnee, 1) : null;
 
-        $dureeMoyenneGestation = round($breedings->avg(function($b) {
-            return Carbon::parse($b->date_mise_bas)->diffInDays(Carbon::parse($b->date_croisement));
-        }));
+        $dureeMoyenneGestation = 0;
+        if ($breedings->count()) {
+            // si date_croisement et date_mise_bas présentes, calculer la durée
+            $dureeMoyenneGestation = round($breedings->avg(function($b) {
+                if ($b->date_croisement && $b->date_mise_bas) {
+                    return Carbon::parse($b->date_mise_bas)->diffInDays(Carbon::parse($b->date_croisement));
+                }
+                return 0;
+            }));
+        }
 
         $nbGestations = $breedings->count();
         $nbGestationsReussies = $breedings->where('reussite', true)->count();
@@ -51,44 +60,48 @@ class ReproductiveAnalyticsController extends Controller
         $nbTotalNes = $breedings->sum('taille_portee');
         $tauxMortalite = $nbTotalNes > 0 ? round(($nbMorts / $nbTotalNes) * 100, 1) : 0;
 
-        $tauxMortaliteLastMonth = 0;
-        $nbMortsLastMonth = Breeding::where('date_croisement', '>=', Carbon::now()->subDays($periode+30))
-            ->where('date_croisement', '<', Carbon::now()->subDays($periode))
+        $nbMortsLastPeriod = Breeding::where('date_mise_bas', '>=', Carbon::now()->subDays($periode+30))
+            ->where('date_mise_bas', '<', Carbon::now()->subDays($periode))
+            ->when($espece, function($q) use ($espece) { $q->where('espece', $espece); })
             ->sum('nb_morts');
-        $nbTotalNesLastMonth = Breeding::where('date_croisement', '>=', Carbon::now()->subDays($periode+30))
-            ->where('date_croisement', '<', Carbon::now()->subDays($periode))
+        $nbTotalNesLastPeriod = Breeding::where('date_mise_bas', '>=', Carbon::now()->subDays($periode+30))
+            ->where('date_mise_bas', '<', Carbon::now()->subDays($periode))
+            ->when($espece, function($q) use ($espece) { $q->where('espece', $espece); })
             ->sum('taille_portee');
-        if ($nbTotalNesLastMonth > 0) {
-            $tauxMortaliteLastMonth = round(($nbMortsLastMonth / $nbTotalNesLastMonth) * 100, 1);
-        }
-        $variationMortalite = $tauxMortaliteLastMonth ? round($tauxMortalite - $tauxMortaliteLastMonth, 1) : null;
 
-        // Graphiques
-        // Accouplements réussis par mois (12 derniers mois)
+        $tauxMortaliteLastPeriod = $nbTotalNesLastPeriod > 0 ? round(($nbMortsLastPeriod / $nbTotalNesLastPeriod) * 100, 1) : 0;
+        $variationMortalite = $tauxMortaliteLastPeriod ? round($tauxMortalite - $tauxMortaliteLastPeriod, 1) : null;
+
+        // Graphiques — mises bas par mois (sur date_mise_bas)
         $accouplementsParMois = Breeding::select(
-                DB::raw('DATE_FORMAT(date_croisement, "%Y-%m") as mois'),
+                DB::raw('DATE_FORMAT(date_mise_bas, "%Y-%m") as mois'),
                 DB::raw('COUNT(*) as total')
             )
             ->when($espece, function($q) use ($espece) {
-                $q->whereHas('female', function($q2) use ($espece) {
-                    $q2->where('type', $espece);
-                });
+                $q->where('espece', $espece);
             })
-            ->where('date_croisement', '>=', Carbon::now()->subMonths(12))
+            ->where('date_mise_bas', '>=', Carbon::now()->subMonths(12))
             ->groupBy('mois')
             ->orderBy('mois')
             ->get();
 
-        // Taille de portée par espèce
+        // Taille de portée par espèce (espece colonne)
         $tailleParEspece = Breeding::select('espece', DB::raw('AVG(taille_portee) as moyenne'))
-            ->join('animals as femelles', 'breedings.female_id', '=', 'femelles.id')
+            ->when($espece, function($q) use ($espece) {
+                $q->where('espece', $espece);
+            })
             ->groupBy('espece')
             ->get();
 
-        // Pour le filtre
+        // Pour le filtre : récupérer types d'animaux
         $especes = Animal::select('type')->distinct()->pluck('type');
 
+        // Aliases pour correspondre aux noms attendus par la vue (compatibilité)
+        $totalAccouplements = $totalMisesBas;
+        $variationAccouplements = $variationMisesBas;
+
         return view('reproductive-analytics', compact(
+            'totalMisesBas', 'variationMisesBas',
             'totalAccouplements', 'variationAccouplements',
             'tailleMoyennePortee', 'variationPortee',
             'dureeMoyenneGestation',

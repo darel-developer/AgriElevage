@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Animal;
 use App\Models\Breeding;
+use Carbon\Carbon;
 
 class BreedingController extends Controller
 {
@@ -25,10 +26,16 @@ class BreedingController extends Controller
             'nb_morts' => 'required|integer|min:0',
         ]);
 
+        // Récupère la femelle pour déterminer l'espèce
+        $female = Animal::find($request->female_id);
+
         // Calcul automatique de la réussite
         $taille = (int)$request->taille_portee;
         $morts = (int)$request->nb_morts;
         $reussite = ($taille > 0 && $taille > $morts) ? 1 : 0;
+
+        // date_croisement : si fourni dans la requête on l'utilise, sinon maintenant
+        $dateCroisement = $request->input('date_croisement') ? $request->input('date_croisement') : Carbon::now()->toDateString();
 
         $breeding = Breeding::create([
             'male_id' => $request->male_id,
@@ -37,6 +44,8 @@ class BreedingController extends Controller
             'taille_portee' => $taille,
             'nb_morts' => $morts,
             'reussite' => $reussite,
+            'date_croisement' => $dateCroisement,
+            'espece' => $female ? $female->type : null,
         ]);
 
         // Pour AJAX

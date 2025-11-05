@@ -10,7 +10,8 @@ class Breeding extends Model
     use HasFactory;
 
     protected $fillable = [
-        'male_id', 'female_id', 'date_mise_bas', 'taille_portee', 'nb_morts', 'reussite'
+        'male_id', 'female_id', 'date_mise_bas', 'taille_portee', 'nb_morts', 'reussite',
+        'date_croisement', 'espece'
     ];
 
     public function male()

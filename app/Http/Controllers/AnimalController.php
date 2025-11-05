@@ -17,6 +17,15 @@ class AnimalController extends Controller
             'type' => 'required|in:poule,lapin',
             'categorie' => 'required|string|max:255',
             'date_naissance' => 'required|date',
+            // champs optionnels
+            'identifiant' => 'nullable|string|max:255',
+            'race' => 'nullable|string|max:255',
+            'mere' => 'nullable|string|max:255',
+            'pere' => 'nullable|string|max:255',
+            'grands_parents' => 'nullable|string|max:1000',
+            'historique' => 'nullable|string|max:2000',
+            'vendu' => 'nullable|boolean',
+            'poids' => 'nullable|numeric'
         ]);
 
         Animal::create($request->all());
@@ -66,10 +75,11 @@ class AnimalController extends Controller
                     'nom' => $a->nom,
                     'type' => ucfirst($a->type),
                     'sexe' => ucfirst($a->sexe),
-                    'categorie' => $a->categorie, // <-- Ajouté
-                    'identifiant' => $a->identifiant ?? '', // <-- Si tu veux l'afficher
+                    'categorie' => $a->categorie,
+                    'identifiant' => $a->identifiant ?? 'Information inconnue',
                     'age' => $this->getAge($a->date_naissance),
-                    'statut' => $a->statut ?? 'En bonne santé'
+                    'statut' => $a->statut ?? 'En bonne santé',
+                    'vendu' => (bool) ($a->vendu ?? false) // true/false pour l'affichage côté JS
                 ];
             });
             return response()->json($animaux);
@@ -89,13 +99,15 @@ class AnimalController extends Controller
             'nom' => $a->nom,
             'type' => ucfirst($a->type),
             'sexe' => ucfirst($a->sexe),
-            'race' => $a->race ?? '-',
-            'date_naissance' => $a->date_naissance,
-            'identifiant' => $a->identifiant ?? '-',
-            'mere' => $a->mere ?? '-',
-            'pere' => $a->pere ?? '-',
-            'grands_parents' => $a->grands_parents ?? '-',
+            'race' => $a->race ?? 'Information inconnue',
+            'date_naissance' => $a->date_naissance ?? 'Information inconnue',
+            'identifiant' => $a->identifiant ?? 'Information inconnue',
+            'mere' => $a->mere ?? 'Information inconnue',
+            'pere' => $a->pere ?? 'Information inconnue',
+            'grands_parents' => $a->grands_parents ?? 'Information inconnue',
             'historique' => $a->historique ?? '',
+            'vendu' => (bool) ($a->vendu ?? false),
+            'poids' => $a->poids ?? null
         ]);
     }
 
@@ -116,12 +128,23 @@ class AnimalController extends Controller
     {
         $animal = Animal::findOrFail($id);
         $request->validate([
-            'nom' => 'required|string|max:255',
-            'sexe' => 'required|in:male,femelle',
-            'type' => 'required|in:poule,lapin',
-            'categorie' => 'required|string|max:255',
-            'date_naissance' => 'required|date',
+            // utilisation de "sometimes" pour permettre les mises à jour partielles (poids/vendu sans renvoyer tous les champs)
+            'nom' => 'sometimes|required|string|max:255',
+            'sexe' => 'sometimes|required|in:male,femelle',
+            'type' => 'sometimes|required|in:poule,lapin',
+            'categorie' => 'sometimes|required|string|max:255',
+            'date_naissance' => 'sometimes|required|date',
+            // champs optionnels pouvant être mis à jour (poids, vendu, identifiant, etc.)
+            'identifiant' => 'sometimes|nullable|string|max:255',
+            'race' => 'sometimes|nullable|string|max:255',
+            'mere' => 'sometimes|nullable|string|max:255',
+            'pere' => 'sometimes|nullable|string|max:255',
+            'grands_parents' => 'sometimes|nullable|string|max:1000',
+            'historique' => 'sometimes|nullable|string|max:2000',
+            'vendu' => 'sometimes|nullable|boolean',
+            'poids' => 'sometimes|nullable|numeric'
         ]);
+        // update accepte maintenant les champs fillable du modèle
         $animal->update($request->all());
         return response()->json(['success' => true]);
     }
