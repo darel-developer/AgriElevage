@@ -39,10 +39,55 @@ class AnimalController extends Controller
         $types = \App\Models\Animal::selectRaw('type, COUNT(*) as count')->groupBy('type')->pluck('count', 'type');
 
         if ($request->ajax() || $request->query('poll')) {
+            // préparer alertes réelles
+            $alerts = [];
+
+            // 1) Mises-bas prévues dans les 7 prochains jours
+            $today = Carbon::today();
+            $in7 = Carbon::today()->addDays(7);
+            $upcoming = \App\Models\Breeding::with('female')
+                ->whereBetween('date_mise_bas', [$today->toDateString(), $in7->toDateString()])
+                ->orderBy('date_mise_bas')
+                ->get();
+            foreach ($upcoming as $b) {
+                $alerts[] = [
+                    'type' => 'mise_bas',
+                    'message' => 'Mise-bas prévue: ' . ($b->female ? $b->female->nom : '—'),
+                    'date' => $b->date_mise_bas,
+                    'priority' => 'high'
+                ];
+            }
+
+            // 2) Animaux sans enregistrement de poids
+            $noWeight = \App\Models\Animal::whereNull('poids')->limit(6)->get();
+            foreach ($noWeight as $a) {
+                $alerts[] = [
+                    'type' => 'poids_manquant',
+                    'message' => "Poids manquant pour: {$a->nom} ({$a->type})",
+                    'date' => null,
+                    'priority' => 'medium'
+                ];
+            }
+
+            // 3) Animaux marqués vendus récemment (7 derniers jours)
+            $soldRecent = \App\Models\Animal::where('vendu', 1)
+                ->where('updated_at', '>=', Carbon::now()->subDays(7))
+                ->limit(6)
+                ->get();
+            foreach ($soldRecent as $a) {
+                $alerts[] = [
+                    'type' => 'vendu',
+                    'message' => "Vendu récemment: {$a->nom} ({$a->type})",
+                    'date' => $a->updated_at ? $a->updated_at->toDateString() : null,
+                    'priority' => 'low'
+                ];
+            }
+
             return response()->json([
                 'total' => $total,
                 'poule' => $types['poule'] ?? 0,
                 'lapin' => $types['lapin'] ?? 0,
+                'alerts' => $alerts
             ]);
         }
 

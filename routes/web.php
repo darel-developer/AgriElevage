@@ -7,6 +7,7 @@ use App\Http\Controllers\AnimalController;
 use App\Http\Controllers\BreedingController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ReproductiveAnalyticsController;
+use App\Http\Controllers\CourseController;
 use Illuminate\Support\Facades\View;
 
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -49,6 +50,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/genetique', function () {
         return view('genetique');
     })->name('genetique');
-    Route::get('/reproductive-analytics', [ReproductiveAnalyticsController::class, 'index'])->name('reproductive.analytics');
+    Route::get('/reproductive-analytics', [ReproductiveAnalyticsController::class, 'index'])->name('reproductive-analytics');
+    Route::get('/learning-courses', function (){
+        // fournir toujours une variable $courses (vide par défaut)
+        return view('learning-courses', ['courses' => []]);
+    })->name('learning-courses');
+
+    // Courses learning API (AJAX)
+    Route::get('/api/courses', [CourseController::class, 'index'])->name('api.courses.index');
+    Route::post('/learning-courses/upload', [CourseController::class, 'store'])->name('learning.courses.upload');
 });
 

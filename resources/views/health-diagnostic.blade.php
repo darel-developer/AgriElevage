@@ -128,7 +128,7 @@
         <li class="nav-item mb-2"><a class="nav-link rounded" href="#"><i class="bi bi-activity"></i>Reproduction</a></li>
         <li class="nav-item mb-2"><a class="nav-link active rounded" href="#"><i class="bi bi-heart-pulse"></i>Santé</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('genetique')}}"><i class="bi bi-activity"></i>Génétique</a></li>
-        <li class="nav-item mb-2"><a class="nav-link rounded" href="#"><i class="bi bi-journal-bookmark"></i>Apprentissage</a></li>
+        <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('learning-courses')}}"><i class="bi bi-journal-bookmark"></i>Apprentissage</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="#"><i class="bi bi-people"></i>Communauté</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('chatbot')}}"><i class="bi bi-briefcase"></i>Assistant IA</a></li>
     </ul>
@@ -149,6 +149,17 @@
                 Sélectionnez les symptômes observés chez votre animal pour obtenir un diagnostic préliminaire et des recommandations.
             </div>
             <form id="diagnosticForm">
+                <!-- Espèce ajoutée pour affiner le diagnostic -->
+                <div class="mb-3">
+                    <label class="form-label">Type d'animal</label>
+                    <select id="diagnosticSpecies" name="species" class="form-select" required>
+                        <option value="">Choisir l'espèce...</option>
+                        <option value="poule">Poule</option>
+                        <option value="lapin">Lapin</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+
                 <div class="symptom-section-title">Symptômes Généraux</div>
                 <div>
                     <button type="button" class="symptom-btn" data-symptom="Fièvre">Fièvre</button>
@@ -185,11 +196,15 @@
                     <button type="button" class="symptom-btn" data-symptom="Changement d'habitudes">Changement d'habitudes</button>
                     <button type="button" class="symptom-btn" data-symptom="Boiterie">Boiterie</button>
                 </div>
+                <!-- Zone de résultat ajoutée -->
+                <div id="diagnosticResult" class="mt-4"></div>
+
                 <button type="submit" class="diagnostic-btn">Calculer le Diagnostic</button>
             </form>
         </div>
     </div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // Sidebar hamburger
@@ -211,12 +226,108 @@
         });
     });
 
-    // Soumission du diagnostic (à compléter côté backend si besoin)
+    // Règles simples par espèce (symptômes clés → maladies possibles)
+    const diseaseRules = {
+        poule: [
+            { symptoms: ['Diarrhée','Perte d\'appétit'], disease: 'Coccidiose', advice: 'Consulter un vétérinaire; maintenir l\'hygiène du poulailler; traitement antiparasitaire possible.' },
+            { symptoms: ['Toux','Écoulement nasal','Éternuements'], disease: 'Infection respiratoire (ex: grippe aviaire possible)', advice: 'Isoler l\'individu; contacter un vétérinaire rapidement; signaler si suspecté.' },
+            { symptoms: ['Perte de poids','Perte d\'appétit'], disease: 'Parasitoses internes ou malnutrition', advice: 'Vérifier l\'alimentation et vermifuger si nécessaire; consulter pour diagnostic.' },
+            { symptoms: ['Vomissements','Diarrhée'], disease: 'Gastro-entérite', advice: 'Hydratation, isolement; consulter pour antibiothérapie si nécessaire.' }
+        ],
+        lapin: [
+            { symptoms: ['Diarrhée','Perte d\'appétit'], disease: 'Gastro-entérite (entérite)', advice: 'Arrêter aliments riches, contacter vétérinaire; risque de déshydratation.' },
+            { symptoms: ['Toux','Difficulté à respirer','Écoulement nasal'], disease: 'Pasteurellose (infection respiratoire)', advice: 'Réserver examen vétérinaire; traitement antibiotique souvent requis.' },
+            { symptoms: ['Perte de poils','Démangeaisons'], disease: 'Parasites externes (acarien, puces)', advice: 'Traitement antiparasitaire topique ou systémique selon avis vétérinaire.' },
+            { symptoms: ['Boiterie','Lésions cutanées'], disease: 'Abcès ou infection locale', advice: 'Nettoyage et examen; possible incision/antibiotique par vétérinaire.' }
+        ],
+        autre: [
+            { symptoms: [], disease: 'Symptômes multiples', advice: 'Choisissez l\'espèce adaptée ; consulter un vétérinaire pour un diagnostic précis.' }
+        ]
+    };
+
+    // Utilitaires
+    function arrayIncludesAll(haystack, needles) {
+        return needles.every(n => haystack.includes(n));
+    }
+
+    function unique(arr) {
+        return Array.from(new Set(arr));
+    }
+
+    // Soumission du diagnostic - évalue règles et affiche résultats
     document.getElementById('diagnosticForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        const species = document.getElementById('diagnosticSpecies').value;
+        const resultEl = document.getElementById('diagnosticResult');
+        resultEl.innerHTML = '';
+
+        if (!species) {
+            resultEl.innerHTML = '<div class="alert alert-warning">Veuillez sélectionner l\'espèce de l\'animal pour un diagnostic précis.</div>';
+            return;
+        }
+
         const selected = Array.from(document.querySelectorAll('.symptom-btn.selected')).map(b => b.dataset.symptom);
-        alert("Symptômes sélectionnés :\n" + selected.join(', '));
-        // Ici, envoyer les symptômes au backend pour diagnostic si besoin
+        if (selected.length === 0) {
+            resultEl.innerHTML = '<div class="alert alert-info">Sélectionnez au moins un symptôme pour obtenir un diagnostic.</div>';
+            return;
+        }
+
+        // normaliser sélection (trim)
+        const sel = selected.map(s => s.trim());
+        const rules = diseaseRules[species] || diseaseRules['autre'];
+
+        const probable = [];
+        const possible = [];
+
+        // Check exact/subset matches first (probable)
+        rules.forEach(rule => {
+            const ruleSymptoms = rule.symptoms;
+            if (ruleSymptoms.length === 0) return;
+            if (arrayIncludesAll(sel, ruleSymptoms)) {
+                probable.push(rule);
+            } else {
+                // partial overlap => possible
+                const overlap = ruleSymptoms.filter(s => sel.includes(s));
+                if (overlap.length > 0) possible.push(Object.assign({ overlap }, rule));
+            }
+        });
+
+        // Build result HTML
+        let html = '';
+        if (probable.length) {
+            html += '<div class="alert alert-success"><strong>Diagnostics probables :</strong><ul>';
+            probable.forEach(r => {
+                html += `<li><strong>${r.disease}</strong> — ${r.advice}</li>`;
+            });
+            html += '</ul></div>';
+        }
+
+        if (!probable.length && possible.length) {
+            html += '<div class="alert alert-warning"><strong>Diagnostics possibles (basés sur correspondances partielles) :</strong><ul>';
+            // deduplicate by disease
+            const seen = new Set();
+            possible.forEach(r => {
+                if (seen.has(r.disease)) return;
+                seen.add(r.disease);
+                const overlaps = r.overlap ? (' Symptômes correspondants : ' + r.overlap.join(', ')) : '';
+                html += `<li><strong>${r.disease}</strong> — ${r.advice}${overlaps}</li>`;
+            });
+            html += '</ul></div>';
+        }
+
+        if (!probable.length && !possible.length) {
+            html += '<div class="alert alert-secondary"><strong>Aucune correspondance précise trouvée.</strong><br>Consultez un vétérinaire pour un diagnostic exact. En attendant : vérifiez hydratation, isolement, alimentation et la température. Vous pouvez aussi consulter nos cours pour plus d\'informations.</div>';
+        }
+
+        // Suggestions générales et liens
+        html += `<div class="mt-2"><a href="{{ route('learning-courses') }}" class="btn btn-sm btn-outline-success me-2">Voir les cours d'apprentissage</a> <button class="btn btn-sm btn-outline-primary" id="btnContactVet">Contacter un vétérinaire (simulation)</button></div>`;
+
+        resultEl.innerHTML = html;
+
+        // attach handler for simulated contact
+        document.getElementById('btnContactVet').addEventListener('click', function() {
+            alert('Veuillez contacter votre vétérinaire local. (Simulation)');
+        });
     });
 </script>
 </body>

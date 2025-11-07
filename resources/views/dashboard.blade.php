@@ -144,13 +144,13 @@
             <a class="nav-link rounded" href="{{route('health.diagnostic')}}"><i class="bi bi-heart-pulse"></i>Santé</a>
         </li>
         <li class="nav-item mb-2">
-            <a class="nav-link rounded" href="#"><i class="bi bi-activity"></i>Reproduction</a>
+            <a class="nav-link rounded" href="{{route('reproductive-analytics')}}"><i class="bi bi-activity"></i>Reproduction</a>
         </li>
         <li class="nav-item mb-2">
             <a class="nav-link rounded" href="{{route('genetique')}}"><i class="bi bi-activity"></i>Génétique</a>
         </li>
         <li class="nav-item mb-2">
-            <a class="nav-link rounded" href="#"><i class="bi bi-journal-bookmark"></i>Apprentissage</a>
+            <a class="nav-link rounded" href="{{route('learning-courses')}}"><i class="bi bi-journal-bookmark"></i>Apprentissage</a>
         </li>
         <li class="nav-item mb-2">
             <a class="nav-link rounded" href="#"><i class="bi bi-people"></i>Communauté</a>
@@ -239,19 +239,10 @@
                 <div class="card-box mb-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <div class="fw-bold" style="color:#345c37;">Alertes Importantes</div>
-                        <button class="btn btn-outline-success btn-sm" style="border-radius:0.7rem;">Gérer</button>
+                        <button id="manageAlertsBtn" class="btn btn-outline-success btn-sm" style="border-radius:0.7rem;">Gérer</button>
                     </div>
-                    <div class="mb-2 d-flex align-items-center" style="color:#e6a700;">
-                        <i class="bi bi-exclamation-triangle-fill alert-icon"></i>
-                        Vaccination à venir pour "Bella" (Ovin)
-                    </div>
-                    <div class="mb-2 d-flex align-items-center" style="color:#5fc77a;">
-                        <i class="bi bi-bell-fill alert-icon"></i>
-                        Mise bas prévue pour "Daisy" (Ovin)
-                    </div>
-                    <div class="d-flex align-items-center" style="color:#e74c3c;">
-                        <i class="bi bi-x-circle-fill alert-icon"></i>
-                        Problème de santé détecté sur "Max" (Bovin)
+                    <div id="importantAlerts">
+                        <div class="text-center text-muted py-2">Chargement des alertes...</div>
                     </div>
                 </div>
             </div>
@@ -419,9 +410,43 @@
                 document.getElementById('type-poule').textContent = data.poule || 0;
                 document.getElementById('type-lapin').textContent = data.lapin || 0;
             }
+            // Render alerts if present
+            const container = document.getElementById('importantAlerts');
+            if (data && Array.isArray(data.alerts)) {
+                if (data.alerts.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted py-2">Aucune alerte pour le moment.</div>';
+                } else {
+                    container.innerHTML = '';
+                    data.alerts.forEach(alert => {
+                        let color = '#f0ad4e'; // default
+                        let icon = 'bi-info-circle';
+                        if (alert.priority === 'high') { color = '#e74c3c'; icon = 'bi-exclamation-octagon-fill'; }
+                        else if (alert.priority === 'medium') { color = '#f0ad4e'; icon = 'bi-bell-fill'; }
+                        else if (alert.priority === 'low') { color = '#5fc77a'; icon = 'bi-check-circle-fill'; }
+                        const dateHtml = alert.date ? `<div class="small text-muted">${new Date(alert.date).toLocaleDateString('fr-FR')}</div>` : '';
+                        container.innerHTML += `
+                            <div class="mb-2 d-flex align-items-start" style="color:${color};">
+                                <i class="bi ${icon} alert-icon me-2" style="font-size:1.1rem;"></i>
+                                <div>
+                                    <div class="fw-bold" style="color:#345c37;">${alert.message}</div>
+                                    ${dateHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        })
+        .catch(() => {
+            // keep existing content on error
         });
     }
     setInterval(updateResumeAnimaux, 2000);
+
+    // Gestion simple du bouton "Gérer" (ouvre page des événements)
+    document.getElementById('manageAlertsBtn').addEventListener('click', function() {
+        window.location.href = "{{ route('breeding-planning') }}";
+    });
 
     // Affichage dynamique des événements à venir (prochains 7 jours)
     function loadEvenementsAvenir() {

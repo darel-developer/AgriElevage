@@ -117,9 +117,9 @@
         <li class="nav-item mb-2"><a class="nav-link rounded" href="{{ route('dashboard') }}"><i class="bi bi-house-door"></i>Accueil</a></li>
         <li class="nav-item mb-2"><a class="nav-link active rounded" href="#"><i class="bi bi-person-lines-fill"></i>Suivi Individuel</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('health.diagnostic')}}"><i class="bi bi-heart-pulse"></i>Santé</a></li>
-        <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('reproductive.analytics')}}"><i class="bi bi-activity"></i>Reproduction</a></li>
+        <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('reproductive-analytics')}}"><i class="bi bi-activity"></i>Reproduction</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('genetique')}}"><i class="bi bi-activity"></i>Génétique</a></li>
-        <li class="nav-item mb-2"><a class="nav-link rounded" href="#"><i class="bi bi-journal-bookmark"></i>Apprentissage</a></li>
+        <li class="nav-item mb-2"><a class="nav-link rounded" href="{{route('learning-courses')}}"><i class="bi bi-journal-bookmark"></i>Apprentissage</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="#"><i class="bi bi-people"></i>Communauté</a></li>
         <li class="nav-item mb-2"><a class="nav-link rounded" href="{{ route('chatbot') }}"><i class="bi bi-briefcase"></i>Assistant IA</a></li>
     </ul>
