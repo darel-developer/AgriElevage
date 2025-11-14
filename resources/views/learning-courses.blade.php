@@ -57,11 +57,15 @@
             object-fit: cover;
         }
 		.main-content { margin-left:220px; padding:2rem 1rem; min-height:100vh; }
-		.course-card { border-radius:0.8rem; box-shadow:0 1px 8px rgba(31,38,135,0.06); background:#fff; padding:1rem; }
+		.course-card { border-radius:0.8rem; box-shadow:0 1px 8px rgba(31,38,135,0.06); background:#fff; padding:1rem; transition: transform .18s ease, box-shadow .18s ease; }
+		.course-card:hover { transform: translateY(-6px); box-shadow: 0 14px 30px rgba(0,0,0,0.08); }
 		.badge-free { background:#5fc77a; color:#fff; }
 		.badge-paid { background:#e74c3c; color:#fff; }
 		.filter-row .form-control, .filter-row .form-select { min-width:150px; }
 		@media (max-width:991.98px) { .sidebar { position:static; width:100%; min-height:auto; } .main-content{margin-left:0;} }
+
+		/* small helper to show/hide 3d */
+		#course3dPreviewWrapper { border-radius: .6rem; overflow:hidden; background:#fafafa; display:flex; align-items:center; justify-content:center; }
 	</style>
 </head>
 <body>
@@ -170,6 +174,10 @@
 						</div>
 						<div class="modal-body" id="courseModalBody">
 							<!-- détail rempli par JS -->
+							<div id="course3dPreviewWrapper" style="width:100%;height:220px;margin-bottom:1rem;display:none;">
+								<canvas id="course3dCanvas" style="width:100%;height:100%;display:block;"></canvas>
+							</div>
+							<div id="courseDetailsContent"></div>
 						</div>
 						<div class="modal-footer">
 							<span id="courseBadge"></span>
@@ -228,10 +236,27 @@
 				</div>
 			</div>
 
+			<!-- Account Settings Modal (reused) -->
+			<div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true">
+				<div class="modal-dialog">
+					<form class="modal-content" id="accountForm">
+						<div class="modal-header"><h5 class="modal-title">Paramètres du compte</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+						<div class="modal-body">
+							<div id="accountAlert"></div>
+							<div class="mb-3"><label class="form-label">Nom</label><input id="accountName" name="name" class="form-control" required></div>
+							<div class="mb-3"><label class="form-label">Email</label><input id="accountEmail" name="email" type="email" class="form-control" required></div>
+							<div class="mb-3"><button id="sendResetBtn" type="button" class="btn btn-outline-danger">Modifier le mot de passe (envoyer lien par email)</button></div>
+						</div>
+						<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button><button type="submit" class="btn btn-success">Enregistrer</button></div>
+					</form>
+				</div>
+			</div>
+
 		</div>
 	</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 <script>
 	// coursesData chargé depuis l'API
 	let coursesData = [];
@@ -326,6 +351,58 @@
 		courseModal.show();
 	};
 
+	// init 3D preview
+	(function(){
+		const courseModalEl = document.getElementById('courseModal');
+		if (!courseModalEl) return;
+		let renderer, scene, camera, cube, threeInited = false;
+
+		function initCourse3D(containerCanvas) {
+			renderer = new THREE.WebGLRenderer({ canvas: containerCanvas, alpha: true, antialias: true });
+			const w = containerCanvas.clientWidth || 600;
+			const h = containerCanvas.clientHeight || 220;
+			renderer.setSize(w, h, false);
+			scene = new THREE.Scene();
+			camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
+			camera.position.z = 2.6;
+			const light = new THREE.AmbientLight(0xffffff, 0.8); scene.add(light);
+			const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(5,5,5); scene.add(dir);
+			const geom = new THREE.BoxGeometry(1.2,1.2,1.2);
+			cube = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: 0x5fc77a, metalness:0.25, roughness:0.4 }));
+			scene.add(cube);
+			threeInited = true;
+			animateCourse3D();
+		}
+		function animateCourse3D() {
+			if (!threeInited) return;
+			cube.rotation.x += 0.015;
+			cube.rotation.y += 0.02;
+			renderer.render(scene, camera);
+			requestAnimationFrame(animateCourse3D);
+		}
+
+		// Override existing openCourse to also show 3D preview
+		const originalOpen = window.openCourse;
+		window.openCourse = function(id) {
+			originalOpen && originalOpen(id);
+			// small delay to let courseModal content populate
+			setTimeout(() => {
+				const canvas = document.getElementById('course3dCanvas');
+				const wrapper = document.getElementById('course3dPreviewWrapper');
+				const content = document.getElementById('courseModalBody')?.querySelector('#courseModalBody, #courseDetailsContent');
+				// map price -> color
+				const course = (window.coursesData || []).find(c => c.id == id) || null;
+				if (!course || !canvas || !wrapper) return;
+				wrapper.style.display = 'block';
+				// init three if needed
+				if (!threeInited) initCourse3D(canvas);
+				// set cube color based on price/type
+				const color = course.price === 'free' ? 0x5fc77a : 0xe74c3c;
+				if (cube && cube.material) cube.material.color.setHex(color);
+			}, 80);
+		};
+	})();
+
 	// open upload modal
 	document.getElementById('addCourseBtn').addEventListener('click', function() {
 		document.getElementById('courseUploadForm').reset();
@@ -365,6 +442,62 @@
 			document.getElementById('courseUploadAlert').innerHTML = `<div class="alert alert-danger">${msg}</div>`;
 		});
 	});
+
+	// account modal (same logic)
+	(function(){
+		const profile = document.querySelector('.sidebar-profile');
+		if (!profile) return;
+		const accountModalEl = document.getElementById('accountModal');
+		const accountModal = new bootstrap.Modal(accountModalEl);
+		const accountForm = document.getElementById('accountForm');
+		const accountName = document.getElementById('accountName');
+		const accountEmail = document.getElementById('accountEmail');
+		const accountAlert = document.getElementById('accountAlert');
+		const sendResetBtn = document.getElementById('sendResetBtn');
+
+		const currentUser = { name: {!! json_encode(Auth::user()->name ?? '') !!}, email: {!! json_encode(Auth::user()->email ?? '') !!}, photo: {!! json_encode(Auth::user()->profile_photo_url ?? null) !!} };
+
+		profile.style.cursor = 'pointer';
+		profile.addEventListener('click', () => {
+			accountAlert.innerHTML = '';
+			accountName.value = currentUser.name;
+			accountEmail.value = currentUser.email;
+			accountModal.show();
+		});
+
+		accountForm.addEventListener('submit', function(e){
+			e.preventDefault();
+			accountAlert.innerHTML = '';
+			const fd = new FormData(accountForm);
+			fd.append('_token', '{{ csrf_token() }}');
+			fetch("{{ route('account.update') }}", { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd })
+			.then(async res => { const json = await res.json().catch(()=>null); if (!res.ok) throw json || new Error('Erreur');
++				currentUser.name = json.user.name ?? currentUser.name;
++				currentUser.email = json.user.email ?? currentUser.email;
++				currentUser.photo = json.user.avatar ?? json.user.photo ?? json.user.profile_photo_url ?? currentUser.photo;
++				document.querySelectorAll('.sidebar-profile').forEach(sp => {
++					const nameEl = sp.querySelector('.fw-bold') || sp.querySelector('div > .fw-bold');
++					if (nameEl) nameEl.textContent = currentUser.name;
++					const em = sp.querySelector('div.profile-email, div > div.small, div > div:nth-child(2)');
++					if (em) em.textContent = currentUser.email;
++					const img = sp.querySelector('img');
++					if (img && currentUser.photo) img.src = currentUser.photo;
++				});
++				accountAlert.innerHTML = '<div class="alert alert-success">Profil mis à jour.</div>';
++				setTimeout(()=> accountModal.hide(), 900);
+			})
+			.catch(async err => { let msg = 'Erreur lors de la mise à jour.'; if (err && err.errors) msg = Object.values(err.errors).flat().join('<br>'); accountAlert.innerHTML = `<div class="alert alert-danger">${msg}</div>`; });
+		});
+
+		sendResetBtn.addEventListener('click', function(){
+			if (!confirm("Vous allez recevoir un email contenant un lien pour mettre à jour votre mot de passe. Continuer ?")) return;
+			sendResetBtn.disabled = true;
+			fetch("{{ route('account.password.reset') }}", { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json'}, body: JSON.stringify({ email: accountEmail.value }) })
+			.then(async res => { const json = await res.json().catch(()=>null); if (!res.ok) throw json || new Error('Erreur'); accountAlert.innerHTML = '<div class="alert alert-success">Un email va vous être envoyé contenant le lien de modification du mot de passe.</div>'; })
+			.catch(err => { let msg = 'Impossible d\'envoyer le lien pour le moment.'; if (err && err.message) msg = err.message; accountAlert.innerHTML = `<div class="alert alert-danger">${msg}</div>`; })
+			.finally(()=> sendResetBtn.disabled = false);
+		});
+	})();
 
 	const grid = document.getElementById('coursesGrid');
 	const searchEl = document.getElementById('searchCourse');

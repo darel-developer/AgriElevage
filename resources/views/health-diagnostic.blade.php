@@ -205,6 +205,36 @@
     </div>
 </div>
 
+<!-- Account Settings Modal (same as dashboard) -->
+<div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true">
+	<div class="modal-dialog">
+		<form class="modal-content" id="accountForm">
+			<div class="modal-header">
+				<h5 class="modal-title">Paramètres du compte</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+			</div>
+			<div class="modal-body">
+				<div id="accountAlert"></div>
+				<div class="mb-3">
+					<label class="form-label">Nom</label>
+					<input id="accountName" name="name" class="form-control" required>
+				</div>
+				<div class="mb-3">
+					<label class="form-label">Email</label>
+					<input id="accountEmail" name="email" type="email" class="form-control" required>
+				</div>
+				<div class="mb-3">
+					<button id="sendResetBtn" type="button" class="btn btn-outline-danger">Modifier le mot de passe (envoyer lien par email)</button>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+				<button type="submit" class="btn btn-success">Enregistrer</button>
+			</div>
+		</form>
+	</div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // Sidebar hamburger
@@ -329,6 +359,88 @@
             alert('Veuillez contacter votre vétérinaire local. (Simulation)');
         });
     });
+
+    // account modal behavior (shared)
+    (function(){
+	const profile = document.querySelector('.sidebar-profile');
+	if (!profile) return;
+	const accountModalEl = document.getElementById('accountModal');
+	const accountModal = new bootstrap.Modal(accountModalEl);
+	const accountForm = document.getElementById('accountForm');
+	const accountName = document.getElementById('accountName');
+	const accountEmail = document.getElementById('accountEmail');
+	const accountAlert = document.getElementById('accountAlert');
+	const sendResetBtn = document.getElementById('sendResetBtn');
+
+	const currentUser = {
+		name: {!! json_encode(Auth::user()->name ?? '') !!},
+		email: {!! json_encode(Auth::user()->email ?? '') !!},
+		photo: {!! json_encode(Auth::user()->profile_photo_url ?? null) !!}
+	};
+
+	profile.style.cursor = 'pointer';
+	profile.addEventListener('click', () => {
+		accountAlert.innerHTML = '';
+		accountName.value = currentUser.name;
+		accountEmail.value = currentUser.email;
+		accountModal.show();
+	});
+
+	accountForm.addEventListener('submit', function(e){
+		e.preventDefault();
+		accountAlert.innerHTML = '';
+		const fd = new FormData(accountForm);
+		fd.append('_token', '{{ csrf_token() }}');
+		fetch("{{ route('account.update') }}", {
+			method: 'POST',
+			headers: { 'X-Requested-With': 'XMLHttpRequest' },
+			body: fd
+		})
+		.then(async res => {
+			const json = await res.json().catch(()=>null);
+			if (!res.ok) throw json || new Error('Erreur');
++			currentUser.name = json.user.name ?? currentUser.name;
++			currentUser.email = json.user.email ?? currentUser.email;
++			currentUser.photo = json.user.avatar ?? json.user.photo ?? json.user.profile_photo_url ?? currentUser.photo;
++			document.querySelectorAll('.sidebar-profile').forEach(sp => {
++				const nameEl = sp.querySelector('.fw-bold') || sp.querySelector('div > .fw-bold');
++				if (nameEl) nameEl.textContent = currentUser.name;
++				const em = sp.querySelector('div > div.small, div > div:nth-child(2), .profile-email');
++				if (em) em.textContent = currentUser.email;
++				const img = sp.querySelector('img');
++				if (img && currentUser.photo) img.src = currentUser.photo;
++			});
+			accountAlert.innerHTML = '<div class="alert alert-success">Profil mis à jour.</div>';
+			setTimeout(()=> accountModal.hide(), 900);
+		})
+		.catch(async err => {
+			let msg = 'Erreur lors de la mise à jour.';
+			if (err && err.errors) msg = Object.values(err.errors).flat().join('<br>');
+			accountAlert.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
+		});
+	});
+
+	sendResetBtn.addEventListener('click', function(){
+		if (!confirm("Vous allez recevoir un email contenant un lien pour mettre à jour votre mot de passe. Continuer ?")) return;
+		sendResetBtn.disabled = true;
+		fetch("{{ route('account.password.reset') }}", {
+			method: 'POST',
+			headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json'},
+			body: JSON.stringify({ email: accountEmail.value })
+		})
+		.then(async res => {
+			const json = await res.json().catch(()=>null);
+			if (!res.ok) throw json || new Error('Erreur');
+			accountAlert.innerHTML = '<div class="alert alert-success">Un email va vous être envoyé contenant le lien de modification du mot de passe.</div>';
+		})
+		.catch(err => {
+			let msg = 'Impossible d\'envoyer le lien pour le moment.';
+			if (err && err.message) msg = err.message;
+			accountAlert.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
+		})
+		.finally(()=> sendResetBtn.disabled = false);
+	});
+})();
 </script>
 </body>
 </html>

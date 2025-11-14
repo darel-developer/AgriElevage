@@ -8,6 +8,7 @@ use App\Http\Controllers\BreedingController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ReproductiveAnalyticsController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\AccountController;
 use Illuminate\Support\Facades\View;
 
 Route::get('/', [AuthController::class, 'showLogin'])->name('login');
@@ -58,6 +59,35 @@ Route::middleware('auth')->group(function () {
 
     // Courses learning API (AJAX)
     Route::get('/api/courses', [CourseController::class, 'index'])->name('api.courses.index');
-    Route::post('/learning-courses/upload', [CourseController::class, 'store'])->name('learning.courses.upload');
+    Route::post('/learning-courses/upload', [CourseController::class, 'store'])->name('learning-courses.upload');
+
+    // Account management (ajax)
+    Route::post('/account/update', [AccountController::class, 'update'])->name('account.update');
+    Route::post('/account/password-reset', [AccountController::class, 'sendResetLink'])->name('account.password.reset');
+
+    // Animals CSV export / import
+    Route::get('/animals/export', [App\Http\Controllers\AnimalController::class, 'exportCsv'])->name('animals.export');
+    Route::post('/animals/import', [App\Http\Controllers\AnimalController::class, 'importCsv'])->name('animals.import');
 });
+
+// Public route used by Laravel password reset notification to build the reset URL.
+// If you provide an external reset frontend, set PASSWORD_RESET_EXTERNAL_URL in .env (ex: https://auth.example.com/password-reset).
+// Otherwise this closure returns a minimal informational HTML so the route exists and won't throw "Route [password.reset] not defined".
+Route::get('/password/reset/{token}', function ($token) {
+    $external = env('PASSWORD_RESET_EXTERNAL_URL');
+    if ($external) {
+        $url = rtrim($external, '/') . '?token=' . urlencode($token);
+        return redirect()->away($url);
+    }
+    // Minimal HTML response (no view file required)
+    return response()->make(
+        '<!doctype html><html><head><meta charset="utf-8"><title>Réinitialiser le mot de passe</title></head><body style="font-family:Arial,Helvetica,sans-serif;padding:2rem;">'
+        . '<h2>Réinitialisation du mot de passe</h2>'
+        . '<p>Suivez le lien fourni par votre email pour réinitialiser votre mot de passe.</p>'
+        . '<p>Token (pour débogage) : <code>' . e($token) . '</code></p>'
+        . '</body></html>',
+        200,
+        ['Content-Type' => 'text/html']
+    );
+})->name('password.reset');
 
